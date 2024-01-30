@@ -25,6 +25,7 @@ namespace FFU_Fan_Control
         #endregion
 
         #region Fields
+        private Mutex comLock = new Mutex();
         private SerialPort sp = new SerialPort();
         public bool IsConnected = false;
 
@@ -43,9 +44,9 @@ namespace FFU_Fan_Control
             }
         }
         /// <summary>
-        /// Higher speed limit value 0~1000rpm
+        /// Upper speed limit value 0~1000rpm
         /// </summary>
-        private int dataHSV;
+        private int dataHSV = 0x64;
         public int DataHSV
         {
             get { return dataHSV; }
@@ -89,7 +90,6 @@ namespace FFU_Fan_Control
                 IsConnected = false;
             }
         }
-
         public void Disconnect() 
         {
             if (!sp.IsOpen) return;
@@ -97,38 +97,39 @@ namespace FFU_Fan_Control
         }
         public bool GroupWrite(int nSpeed)
         {
-            return GroupWrite(1, nSpeed);
+            return GroupWrite(0, nSpeed);
         }
         public bool GroupWrite(int nMCULID,int nSpeed)
         {
             if(!sp.IsOpen) return false;
-            if(nMCULID <= 0 || nMCULID > 32) return false;
+            if(nMCULID < 0 || nMCULID >= 32) return false;
 
-            int mculID = nMCULID - 1;
-            byte[] gram = new byte[10];
+            int mculID = nMCULID;
+            byte[] packet = new byte[10];
             int dataSV = (nSpeed / 10);
             byte checksum = 0;
 
-            gram[0] = 0x02;
-            gram[1] = (byte)Mode1.GroupWrite;
-            gram[2] = (byte)Mode2.GroupWrite;
-            gram[3] = (byte)(0x81 + mculID);
-            gram[4] = 0x9F;
-            gram[5] = (byte)dataSV;
-            gram[6] = (byte)dataLSV;
-            gram[7] = (byte)dataHSV;
-            gram[9] = 0x03;
+            packet[0] = 0x02;
+            packet[1] = (byte)Mode1.GroupWrite;
+            packet[2] = (byte)Mode2.GroupWrite;
+            packet[3] = (byte)(0x81 + mculID);
+            packet[4] = 0x9F;
+            packet[5] = (byte)dataSV;
+            packet[6] = (byte)dataLSV;
+            packet[7] = (byte)dataHSV;
+            packet[9] = 0x03;
             for (int i = 1; i < 8; i++)
             {
-                checksum += gram[i];
+                checksum += packet[i];
             }
-            gram[8] = checksum;
+            packet[8] = checksum;
 
+            comLock.WaitOne();
             try
             {
-                sp.Write(gram, 0, gram.Length);
-                byte[] resByte = new byte[sp.BytesToRead];
-                int length = sp.Read(resByte, 0, sp.BytesToRead);
+                sp.Write(packet, 0, packet.Length);
+                byte[] resByte = new byte[256];
+                int length = sp.Read(resByte, 0, resByte.Length);
                 if (length <= 0) return false;
                 if (resByte[1] == (byte)Mode1.GroupWrite &&
                     resByte[2] == (byte)Mode2.GroupWrite &&
@@ -138,49 +139,50 @@ namespace FFU_Fan_Control
                 else
                     return false;
             }
-            catch (Exception)
+            catch { return false; }
+            finally
             {
-                return false;
+                comLock.ReleaseMutex();
             }
         }
         public bool BlockWrite(int nLCUID, int nSpeed)
         {
-            return BlockWrite(1, nLCUID, nSpeed);
+            return BlockWrite(0, nLCUID, nSpeed);
         }
         public bool BlockWrite(int nMCULID, int nLCUID, int nSpeed)
         {
             if (!sp.IsOpen) return false;
-            if (nMCULID <= 0 || nMCULID > 32) return false;
-            if (nLCUID <= 0 || nLCUID > 32) return false;
+            if (nMCULID < 0 || nMCULID >= 32 || nLCUID < 0 || nLCUID > 32) return false;
 
-            int mculID = nMCULID - 1;
-            int lcuID = nLCUID - 1;
-            byte[] gram = new byte[12];
+            int mculID = nMCULID;
+            int lcuID = nLCUID;
+            byte[] packet = new byte[12];
             int dataSV = (nSpeed / 10);
             byte checksum = 0;
 
-            gram[0] = 0x02;
-            gram[1] = (byte)Mode1.BlockWrite;
-            gram[2] = (byte)Mode2.BlockWrite;
-            gram[3] = (byte)(0x81 + mculID);
-            gram[4] = 0x9F;
-            gram[5] = (byte)(0x81 + lcuID);
-            gram[6] = (byte)(0x81 + lcuID);
-            gram[7] = (byte)dataSV;
-            gram[8] = (byte)dataLSV;
-            gram[9] = (byte)dataHSV;
-            gram[11] = 0x03;
+            packet[0] = 0x02;
+            packet[1] = (byte)Mode1.BlockWrite;
+            packet[2] = (byte)Mode2.BlockWrite;
+            packet[3] = (byte)(0x81 + mculID);
+            packet[4] = 0x9F;
+            packet[5] = (byte)(0x81 + lcuID);
+            packet[6] = (byte)(0x81 + lcuID);
+            packet[7] = (byte)dataSV;
+            packet[8] = (byte)dataLSV;
+            packet[9] = (byte)dataHSV;
+            packet[11] = 0x03;
             for (int i = 1; i < 10; i++)
             {
-                checksum += gram[i];
+                checksum += packet[i];
             }
-            gram[10] = checksum;
+            packet[10] = checksum;
 
+            comLock.WaitOne();
             try
             {
-                sp.Write(gram, 0, gram.Length);
-                byte[] resByte = new byte[sp.BytesToRead];
-                int length = sp.Read(resByte, 0, sp.BytesToRead);
+                sp.Write(packet, 0, packet.Length);
+                byte[] resByte = new byte[256];
+                int length = sp.Read(resByte, 0, resByte.Length);
                 if (length <= 0) return false;
                 if (resByte[1] == (byte)Mode1.GroupWrite &&
                     resByte[2] == (byte)Mode2.GroupWrite &&
@@ -194,53 +196,184 @@ namespace FFU_Fan_Control
             {
                 return false;
             }
+            finally
+            {
+                comLock.ReleaseMutex();
+            }
         }
         public bool GroupRead(ref int[] nSpeed, ref int[] nStatus)
         {
-          return GroupRead(1,ref nSpeed,ref nStatus);
+          return GroupRead(0,ref nSpeed,ref nStatus);
         }
         public bool GroupRead(int nMCULID,ref int[] nSpeed,ref int[] nStatus)
         {
             if (!sp.IsOpen) return false;
-            if (nMCULID <= 0 || nMCULID > 32) return false;
+            if (nMCULID < 0 || nMCULID >= 32) return false;
 
-            int mculID = nMCULID - 1;
-            byte[] gram = new byte[7];
+            int[] retSpeed = new int[32];
+            int[] retStatus = new int[32];
+            int mculID = nMCULID;
+            byte[] packet = new byte[7];
             byte checksum = 0;
 
-
-            gram[0] = 0x02;
-            gram[1] = (byte)Mode1.GroupRead;
-            gram[2] = (byte)Mode2.GroupRead;
-            gram[3] = (byte)(0x081 + mculID);
-            gram[4] = 0x9F;
-            gram[6] = 0x03;
+            packet[0] = 0x02;
+            packet[1] = (byte)Mode1.GroupRead;
+            packet[2] = (byte)Mode2.GroupRead;
+            packet[3] = (byte)(0x081 + mculID);
+            packet[4] = 0x9F;
+            packet[6] = 0x03;
             for (int i = 1; i < 5; i++)
             {
-                checksum += gram[i];
+                checksum += packet[i];
             }
-            gram[5] = checksum;
+            packet[5] = checksum;
 
+            comLock.WaitOne();
             try
             {
-                sp.Write(gram, 0, gram.Length);
-                byte[] resByte = new byte[sp.BytesToRead];
-                int length = sp.Read(resByte, 0, sp.BytesToRead);
+                sp.Write(packet, 0, packet.Length);
+                byte[] resByte = new byte[256];
+                int length = sp.Read(resByte, 0, resByte.Length);
                 if (length <= 0) return false;
                 if (resByte[1] == (byte)Mode1.GroupWrite &&
                     resByte[2] == (byte)Mode2.GroupWrite &&
                     resByte[3] == (byte)(0x81 + mculID))
                 {
-
+                    for (int j = 0; j < 32; j++)
+                    {
+                        retSpeed[j] = resByte[6 + j];
+                        retStatus[j] = resByte[7 + j];
+                    }
+                    return true;
                 }
                 else
+                {
+                    Array.Fill(retSpeed, 0);
+                    Array.Fill(retStatus, 0);
                     return false;
+                }
+            }
+            catch (Exception)
+            {
+                Array.Fill(retSpeed, 0);
+                Array.Fill(retStatus, 0);
+                return false;
+            }
+            finally
+            {
+                nSpeed = retSpeed;
+                nStatus = retStatus;
+                comLock.ReleaseMutex();
+            }
+        }
+        public bool BlockRead(int nLCUID, ref int nPV, ref int nSV, ref int nST)
+        {
+            return BlockRead(0, nLCUID, ref nPV, ref nSV, ref nST);
+        }
+        public bool BlockRead(int nMCULID,int nLCUID,ref int nPV,ref int nSV,ref int nST)
+        {
+            if (!sp.IsOpen) return false;
+            if (nMCULID < 0 || nMCULID >= 32 || nLCUID < 0 || nLCUID > 32) return false;
+
+            int pv = 0, sv = 0, st = 0;
+            int mculID = nMCULID;
+            int lcuID = nLCUID;
+            byte[] packet = new byte[9];
+            byte checksum = 0;
+
+            packet[0] = 0x02;
+            packet[1] = (byte)Mode1.BlockRead;
+            packet[2] = (byte)Mode2.BlockRead;
+            packet[3] = (byte)(0x81+mculID);
+            packet[4] = 0x9F;
+            packet[5] = (byte)(0x81 + lcuID);
+            packet[6] = (byte)(0x81 + lcuID);
+            packet[8] = 0x03;
+            for (int i = 1; i < 7; i++)
+            {
+                checksum += packet[i];
+            }
+            packet[7] = checksum;
+
+            comLock.WaitOne();
+            try
+            {
+                sp.Write(packet, 0, packet.Length);
+                byte[] resByte = new byte[256];
+                int length = sp.Read(resByte, 0, resByte.Length);
+                if (length <= 0) return false;
+                if (resByte[1] == (byte)Mode1.BlockRead &&
+                    resByte[2] == (byte)Mode2.BlockRead &&
+                    resByte[3] == (byte)(0x81 + mculID) &&
+                    resByte[5] == (byte)(0x81 + lcuID))
+                {
+                    pv = resByte[6];
+                    st = resByte[7];
+                    sv = resByte[8];
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                nPV = pv;
+                nSV = sv; 
+                nST = st;
+                comLock.ReleaseMutex(); 
+            }
+        }
+        public bool Reset(int nLCUID)
+        {
+            return Reset(0, nLCUID);
+        }
+        public bool Reset(int nMCULID, int nLCUID)
+        {
+            if (!sp.IsOpen) return false;
+            if (nMCULID < 0 || nMCULID >= 32 || nLCUID < 0 || nLCUID > 32) return false;
+
+            int mculID = nMCULID;
+            int lcuID = nLCUID;
+            byte[] packet = new byte[10];
+            byte checksum = 0;
+
+            packet[0] = 0x02;
+            packet[1] = (byte)Mode1.Reset;
+            packet[2] = (byte)Mode2.Reset;
+            packet[3] = (byte)(0x81 + mculID);
+            packet[4] = 0x9F;
+            packet[5] = (byte)(0x81 + lcuID);
+            packet[6] = (byte)(0x81 + lcuID);
+            packet[7] = 0xF5;
+            packet[9] = 0x03;
+            for (int i = 1; i < 8; i++)
+            {
+                checksum += packet[i];
+            }
+            packet[8] = checksum;
+
+            comLock.WaitOne();
+            try
+            {
+                sp.Write(packet, 0, packet.Length);
+                byte[] resByte = new byte[256];
+                int length = sp.Read(resByte,0,resByte.Length);
+                return true;
             }
             catch (Exception)
             {
                 return false;
             }
+            finally
+            {
+                comLock.ReleaseMutex();
+            }
         }
-
     }
 }
