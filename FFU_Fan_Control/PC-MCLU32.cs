@@ -94,6 +94,7 @@ namespace FFU_Fan_Control
         {
             if (!sp.IsOpen) return;
             sp.Close();
+            IsConnected = false;
         }
         public bool GroupWrite(int nSpeed)
         {
