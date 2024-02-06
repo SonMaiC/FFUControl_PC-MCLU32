@@ -95,121 +95,110 @@ namespace FFU_Fan_Control
           sendByte[18] = 0xA8; // device D
           sendByte[19] = DataLength[0];
           sendByte[20] = DataLength[1];
-        try
-        {
-        ns.Write(sendByte, 0, 21);
-        ns.Flush();
-        ns.ReadTimeout= 1000;
+          try
+          {
+            ns.Write(sendByte, 0, 21);
+            ns.Flush();
+            ns.ReadTimeout= 1000;
+            
+            byte[] readByte = new byte[256];
+            int length = ns.Read(readByte, 0, readByte.Length);
+            if (length >= 0)
+            {
+              int index = 0;
+              int num11 = (readByte[8] <<8)+ readByte[7]) - 2;
+              int[] numArray = new int[num11 / 2];
+              int num12= 11;
+              while (num12 < (11 + num11))
+              {
+                numArray[index] = readByte[num12+ 1] << 8;
+                numArray[index]+= (Int16)readByte[num12]:
+                num12 += 2;
+                index++;
+              }
+              returnValue = numArray;
+            }
+            else
+            {
+              for (int i = 0; i< nLength; i++)
+              {
+                returnValue[i]=O;
+              }
+            }
+          }
+          catch(Exception ex)
+          {
+            log.WriteLog("Read Block Fail:" + ex.Message.ToString(), LOG.LogType.PLC);
+          }
+          finally
+          {
+            refData = returnValue;
+            plcLock.ReleaseMutex();
+          }
+        }
         
-        byte[] readByte = new byte[256];
-        int length = ns.Read(readByte, 0, readByte.Length);
-        if (length >= 0)
+        private void PLCWriteDevice(int nAddress,int nVal)
         {
-        int index = 0;
-        int num11 = (readByte[8] <<8)+ readByte[7]) - 2;
-        int[] numArray = new int[num11 / 2];
-        int num12= 11;
-        while (num12 < (11 + num11))
+          int[] val = new int[]{ nVal };
+          PLCWriteDeviceBlock(nAddress,1, val);
+        }
+        
+        private void PLCWriteDeviceBlock(int nStartAddr, int nLength, int[] nVal)
         {
-        numArray[index] = readByte[num12+ 1] << 8;
-        numArray[index]+= (Int16)readByte[num12]:
-        num12 += 2;
-        index++;
+          if (!IsPLCConnected || ns == null) return;
+        
+          plcLock.WaitOne();
+        
+          byte[] sendByte = new byte[21 + nLength * 2];
+          byte[] mcLengthByte = BitConverter.GetBytes(12 + nLength * 2);
+          byte[] lengthByte = BitConverter.GetBytes(nLength);
+          byte[] addrByte = BitConverter.GetBytes(nStartAddr);
+        
+          sendByte[0] = 80;
+          sendByte[1] = 0;
+          sendByte[2] = 0;
+          sendByte[3] = 0xFF;
+          sendByte[4] = 0xFF;
+          sendByte[5] = 3;
+          sendByte[6] = 0;
+          sendByte[7] = mcLengthByte[0];
+          sendByte[8] = mcLengthByte[1];
+          sendByte[9] = 10;
+          sendByte[10] = 0;
+          sendByte[11] = 1;
+          sendByte[12] = 20;
+          sendByte[13] = 0;
+          sendByte[14] = 0;
+          sendByte[15] = addrByte[0];
+          sendByte[16] = addrByte[1];
+          sendByte[17] = addrByte[2];
+          sendByte[18] = 0xA8;
+          sendByte[19] = lengthByte[0];
+          sendByte[20] = lengthByte[1];
+        
+          for (int i = 0; i < nLength; i++)
+          {
+            byte[] data = BitConverter.GetBytes(nVal[i]);
+            sendByte[21 + i * 2] = data[0];
+            sendByte[21 + i * 2 + 1]= data[1];
+          }
+        
+          try
+          {
+            ns.Write(sendByte, 0, 21 + nLength * 2);
+            ns.Flush();
+            byte[] readByte = new byte[256];
+            int length = ns.Read(readByte, 0, readByte.Length);
+          }
+          catch (Exception ex)
+          {
+            log.WriteLog("Write Device Fail:" + ex.Message.ToString(), LOG.LogType.PLC);
+          }
+          finally
+          {
+            plcLock.ReleaseMutex);
+          }
         }
-        returnValue = numArray;
-        }
-        else
-        {
-        for (int i = 0; i< nLength; i++)
-        {
-        returnValue[i]=O;
-        }
-        }
-        }
-        catch(Exception ex)
-        {
-        log.WriteLog("Read Block Fail:" + ex.Message.ToString(), LOG.LogType.PLC);
-        }
-        finally
-        {
-        refData = returnValue;
-        plcLock.ReleaseMutex();
-        }
-        }
-
-private void PLCWriteDevice(int nAddress,int
-nVal)
-{
-int[] val = new int[]{ nVal };
-PLCWriteDeviceBlock(nAddress,1, val);
-}
-
-
-private void PLCWriteDeviceBlock(int nStartAddr, int nLength, int[] nVal)
-{
-if (!IsPLCConnected || ns == null) return;
-
-plcLock.WaitOne();
-
-byte[] sendByte = new byte[21 + nLength * 2];
-byte[] mcLengthByte = BitConverter.GetBytes(12 + nLength * 2);
-byte[] lengthByte = BitConverter.GetBytes(nLength);
-byte[] addrByte = BitConverter.GetBytes(nStartAddr);
-
-sendByte[0] = 80;
-sendByte[1] = 0;
-sendByte[2] = 0;
-sendByte[3] = 0xFF;
-sendByte[4] = 0xFF;
-sendByte[5] = 3;
-sendByte[6] = 0;
-sendByte[7] = mcLengthByte[0];
-sendByte[8] = mcLengthByte[1];
-sendByte[9] = 10;
-sendByte[10] = 0;
-sendByte[11] = 1;
-sendByte[12] = 20;
-sendByte[13] = 0;
-sendByte[14] = 0;
-sendByte[15] = addrByte[0];
-sendByte[16] = addrByte[1];
-sendByte[17] = addrByte[2];
-sendByte[18] = 0xA8;
-sendByte[19] = lengthByte[0];
-sendByte[20] = lengthByte[1];
-
-for (int i = 0; i < nLength; i++)
-{
-byte[] data = BitConverter.GetBytes(nVal[i]);
-sendByte[21 + i * 2] = data[0];
-sendByte[21 + i * 2 + 1]= data[1];
-}
-
-try
-{
-ns.Write(sendByte, 0, 21 + nLength * 2);
-ns.Flush();
-byte[] readByte = new byte[256];
-int length = ns.Read(readByte, 0,
-readByte.Length);
-}
-catch (Exception ex)
-{
-log.WriteLog("Write Device Fail:" + ex.Message.ToString(), LOG.LogType.PLC);
-}
-finally
-{
-plcLock.ReleaseMutex);
-}
-}
-
-
-
-
-
-
-
-
-
+        #endregion
     }
 }
