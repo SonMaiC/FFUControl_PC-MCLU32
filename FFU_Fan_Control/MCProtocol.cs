@@ -24,121 +24,118 @@ namespace FFU_Fan_Control
         private string ip;
 
         #endregion
-private void PLCOpen()
-{
-if (IsPLCConnected) return;
-try
-{
-tcpClient = new TcpClient();
-tcpClient.Connect(IPAddress.Parse(iP), port);
-if (tcpClient != null && tcpClient.Connected)
-{
-ns = tcpClient.GetStream();
-IsPLCConnected = true;
-}
-log.WriteLog("PLC Connection Opened!", LOG.LogType.PLC);
-
-}
-catch (Exception ex)
-{
-IsPLCConnected = false;
-log.WriteLog("PLC Open Fail:"+
-ex.Message.ToString(), LOG.LogType.PLC);
-}
-}
-
-
-private void PLCClose()
-{
-if (IsPLCConnected) return;
-if (ns != null)
-{
-ns.Dispose();
-ns = null;
-}
-if (tcpClient!= null)
-{
-tcpClient.Close();
-}
-
-IsPLCConnected = false;
-log.WriteLog("PLC Connection Closed!",
-LOG.LogTyPe.PLC);
-}
-
-private void PLCReadDeviceBlock(int nStartAddr, int nLength, ref int[] refData)
-{
-plcLock.WaitOne();
-int[] returnValue = new int[nLength]:
-
-byte[] sendByte = new byte[21 + nLength * 2];
-byte[] MCLength = BitConverter.GetBytes(nLength * 2 + 12);
-byte[] DataLength =
-BitConverter.GetBytes(nLength);
-byte[] Byteadd = BitConverter.GetBytes(nStarAddr);
-
-sendByte[O]= 0x50; //SubHeader
-sendByte[1] = 0x00; //SubHeader
-sendByte[2] = 0x00; //Access Route-StationNo
-sendByte[3] = 0xFF; //AccessRoute-Network No - 00: Network| FF: PC No
-sendByte[4] = 0xFF; //Access Route-StationNo
-sendByte[5] = 0x03; //Access Route-StationNo
-sendByte[6] = 0x00;
-sendByte[7] = 0x0C;
-sendByte[8] = 0X00;
-sendByte[9] = 0x10;
-sendByte[10] = 0x00;
-sendByte[11] = 0x01; //Command //read
-sendByte[12] = 0x04; //Command //read
-sendByte[13] = 0x00; //Subcommand
-sendByte[14] = 0x00; //SubCommand
-sendByte[15] = Byteadd[0];
-sendByte[16] = Byteadd[1];
-sendByte[17] = Byteadd[2];
-sendByte[18] = 0xA8; // device D
-sendByte[19] = DataLength[0];
-sendByte[20] = DataLength[1];
-try
-{
-ns.Write(sendByte, 0, 21);
-ns.Flush();
-ns.ReadTimeout= 1000;
-
-byte[] readByte = new byte[256];
-int length = ns.Read(readByte, 0, readByte.Length);
-if (length >= 0)
-{
-int index = 0;
-int num11 = (readByte[8] <<8)+ readByte[7]) - 2;
-int[] numArray = new int[num11 / 2];
-int num12= 11;
-while (num12 < (11 + num11))
-{
-numArray[index] = readByte[num12+ 1] << 8;
-numArray[index]+= (Int16)readByte[num12]:
-num12 += 2;
-index++;
-}
-returnValue = numArray;
-}
-else
-{
-for (int i = 0; i< nLength; i++)
-{
-returnValue[i]=O;
-}
-}
-}
-catch(Exception ex)
-{
-log.WriteLog("Read Block Fail:" + ex.Message.ToString(), LOG.LogType.PLC);
-}
-finally
-{
-refData = returnValue;
-plcLock.ReleaseMutex();
-}
-}
+        
+        #region Methods
+        private void PLCOpen()
+        {
+          if (IsPLCConnected) return;
+          try
+          {
+            tcpClient = new TcpClient();
+            tcpClient.Connect(IPAddress.Parse(iP), port);
+            if (tcpClient != null && tcpClient.Connected)
+            {
+              ns = tcpClient.GetStream();
+              IsPLCConnected = true;
+            }
+            log.WriteLog("PLC Connection Opened!", LOG.LogType.PLC);
+          }
+          catch (Exception ex)
+          {
+            IsPLCConnected = false;
+            log.WriteLog("PLC Open Fail:"+ex.Message.ToString(), LOG.LogType.PLC);
+          }
+        }
+        
+        private void PLCClose()
+        {
+          if (IsPLCConnected) return;
+          if (ns != null)
+          {
+            ns.Dispose();
+            ns = null;
+          }
+          if (tcpClient!= null)
+          {
+            tcpClient.Close();
+          }
+          
+          IsPLCConnected = false;
+          log.WriteLog("PLC Connection Closed!", LOG.LogTyPe.PLC);
+        }
+        
+        private void PLCReadDeviceBlock(int nStartAddr, int nLength, ref int[] refData)
+        {
+          plcLock.WaitOne();
+          int[] returnValue = new int[nLength]:
+          
+          byte[] sendByte = new byte[21 + nLength * 2];
+          byte[] MCLength = BitConverter.GetBytes(nLength * 2 + 12);
+          byte[] DataLength = BitConverter.GetBytes(nLength);
+          byte[] Byteadd = BitConverter.GetBytes(nStarAddr);
+          
+          sendByte[0] = 0x50; //SubHeader
+          sendByte[1] = 0x00; //SubHeader
+          sendByte[2] = 0x00; //Access Route-StationNo
+          sendByte[3] = 0xFF; //AccessRoute-Network No - 00: Network| FF: PC No
+          sendByte[4] = 0xFF; //Access Route-StationNo
+          sendByte[5] = 0x03; //Access Route-StationNo
+          sendByte[6] = 0x00;
+          sendByte[7] = 0x0C;
+          sendByte[8] = 0X00;
+          sendByte[9] = 0x10;
+          sendByte[10] = 0x00;
+          sendByte[11] = 0x01; //Command //read
+          sendByte[12] = 0x04; //Command //read
+          sendByte[13] = 0x00; //Subcommand
+          sendByte[14] = 0x00; //SubCommand
+          sendByte[15] = Byteadd[0];
+          sendByte[16] = Byteadd[1];
+          sendByte[17] = Byteadd[2];
+          sendByte[18] = 0xA8; // device D
+          sendByte[19] = DataLength[0];
+          sendByte[20] = DataLength[1];
+        try
+        {
+        ns.Write(sendByte, 0, 21);
+        ns.Flush();
+        ns.ReadTimeout= 1000;
+        
+        byte[] readByte = new byte[256];
+        int length = ns.Read(readByte, 0, readByte.Length);
+        if (length >= 0)
+        {
+        int index = 0;
+        int num11 = (readByte[8] <<8)+ readByte[7]) - 2;
+        int[] numArray = new int[num11 / 2];
+        int num12= 11;
+        while (num12 < (11 + num11))
+        {
+        numArray[index] = readByte[num12+ 1] << 8;
+        numArray[index]+= (Int16)readByte[num12]:
+        num12 += 2;
+        index++;
+        }
+        returnValue = numArray;
+        }
+        else
+        {
+        for (int i = 0; i< nLength; i++)
+        {
+        returnValue[i]=O;
+        }
+        }
+        }
+        catch(Exception ex)
+        {
+        log.WriteLog("Read Block Fail:" + ex.Message.ToString(), LOG.LogType.PLC);
+        }
+        finally
+        {
+        refData = returnValue;
+        plcLock.ReleaseMutex();
+        }
+        }
 
 private void PLCWriteDevice(int nAddress,int
 nVal)
